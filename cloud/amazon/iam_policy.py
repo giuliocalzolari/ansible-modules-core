@@ -48,7 +48,7 @@ options:
       - Whether to create or delete the IAM policy.
     required: true
     default: null
-    choices: [ "present", "absent"]
+    choices: [ "present", "absent","update"]
   skip_duplicates:
     description:
       - By default the module looks for any policies that match the document you pass in, if there is a match it will not make a new policy object with the same rules. You can override this by specifying false which would allow for two policy objects with different names but same rules.
@@ -200,6 +200,9 @@ def role_action(module, iam, name, policy_name, skip, pdoc, state):
     elif state == 'present' and not skip:
         changed = True
         iam.put_role_policy(name, policy_name, pdoc)
+    elif state == 'update' and not policy_match:
+        changed = True
+        iam.put_role_policy(name, policy_name, pdoc)
     elif state == 'absent':
       try:
         iam.delete_role_policy(name, policy_name)
@@ -270,7 +273,7 @@ def main():
       iam_type=dict(
           default=None, required=True, choices=['user', 'group', 'role']),
       state=dict(
-          default=None, required=True, choices=['present', 'absent']),
+          default=None, required=True, choices=['present', 'absent','update']),
       iam_name=dict(default=None, required=False),
       policy_name=dict(default=None, required=True),
       policy_document=dict(default=None, required=False),
@@ -295,6 +298,10 @@ def main():
   if module.params.get('policy_document') != None and module.params.get('policy_json') != None:
       module.fail_json(msg='Only one of "policy_document" or "policy_json" may be set')
 
+  if iam_type != 'role' and state == 'update':
+        module.fail_json(changed=False, msg="iam_type: only role can be updated, "
+                             "please specificy present or absent")
+                             
   if module.params.get('policy_document') != None:
     with open(module.params.get('policy_document'), 'r') as json_data:
           pdoc = json.dumps(json.load(json_data))
